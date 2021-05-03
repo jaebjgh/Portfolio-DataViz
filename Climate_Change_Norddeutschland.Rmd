@@ -1,0 +1,210 @@
+---
+title: "Climate_Change_Norddeutschland"
+author: "Julian"
+date: "28.4.2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Include librarys
+```{r}
+library(tidyverse)
+library(dplyr)
+library(saqgetr)
+library(leaflet)
+library(rdwd) 
+library(lubridate)
+```
+
+### Analyse Climate and weather in Kiel
+
+
+```{r}
+data(geoIndex)  
+data(metaIndex, package = "rdwd")
+```
+
+### Daten einlesen
+Die Daten für diese Arbeit stammen vom Deutschen Wetterdienst (DWD). Mittels des *rdwd* packages können hier aus der Datenbank des DWD historische Wetterdaten und Temperaturmessungen aus ganz Deutschland eingelesen werden. 
+Für Kiel gibt es drei Wetterstationen, die historische Daten liefern. Mittels der *data* Funktion können die Metainformationen aus dem rdwd-Package angesehen werden. Darin finden sich die drei Stationen Kiel-Holtenau, Kiel-Kronshagen und Leuchtturm Kiel. Die erste Station, Kiel-Holtenau liefert seit 1881 bis heute Wetterdaten in täglicher Auflösung. Kiel-Kronshagen zeichnet seit 1988 keine Daten mehr auf und der Leuchtturm Kiel zeichnet seit 1990 bis heute Wetterdaten auf. 
+Da die Temperatur der Wetterstation Leuchtturm eher nicht mit der Temperatur auf dem Festland zu vergleichen ist, werden diese Daten in den Analysen nicht betrachtet.
+
+Im nächsten Absatz werden zunächst alle Wetterdaten aus diesen drei Stationen in täglicher Auflösung eingelesen und in einen Dataframe gespeichert. 
+
+```{r}
+link_holt <- rdwd::selectDWD("Kiel-Holtenau", res="daily", var="kl", per="history")
+link_kron <- rdwd::selectDWD("Kiel-Kronshagen", res="daily", var="kl", per="history")
+link_turm <- rdwd::selectDWD("Leuchtturm Kiel", res="daily", var="kl", per="history")
+file_holt <- rdwd::dataDWD(link_holt, read=FALSE) 
+file_kron <- rdwd::dataDWD(link_kron, read=FALSE) 
+file_turm <- rdwd::dataDWD(link_turm, read=FALSE) 
+df_holt <- rdwd::readDWD(file_holt, varnames=TRUE, fread = FALSE)
+df_kron <- rdwd::readDWD(file_kron, varnames=TRUE, fread = FALSE)
+df_turm <- rdwd::readDWD(file_turm, varnames=TRUE, fread = FALSE)
+```
+
+### Wie viele sehr heiße Tage
+In diesem Abschnitt wird untersucht, wie viele sehr heiße Tage es in jedem Jahr gab. Als heißer Tag wird ein Tag definiert, an dem die Maximaltemperatur über 25°C gewesen ist. 
+Dafür werden erst die beiden Datensätze Kiel-Holtenau und Kiel-Kronshagen miteinander gejoint, da in Kiel_Holtenau die Variable der maximalen Lufttemperatur erst seit 1986 aufgezeichnet wird. Nach dem Join wird eine extra Spalte erzeugt, in der die maximale Tagestemperatur von Kiel-Holtenau oder Kiel-Kronshagen gespeichert wird, je nachdem, welche zur Verfügung steht. 
+Dabei entsteht eine Datenlücke in den Jahren zwischen 2000 und 2005. 
+
+```{r}
+df_hot <- df_holt %>%
+  full_join(df_kron, by = "MESS_DATUM") %>%
+  mutate(TXK.Lufttemperatur_Max = case_when(is.na(TXK.Lufttemperatur_Max.x) & !is.na(TXK.Lufttemperatur_Max.y) ~ TXK.Lufttemperatur_Max.y,
+                                            TRUE ~ TXK.Lufttemperatur_Max.x)) %>%
+  select("MESS_DATUM", "TXK.Lufttemperatur_Max.x", "TXK.Lufttemperatur_Max.y","TXK.Lufttemperatur_Max")  
+
+df_hot %>%
+  mutate(year = lubridate::year(MESS_DATUM)) %>%
+  group_by(year) %>%
+  #filter(!is.na(TXK.Lufttemperatur_Max.x))%>%
+  filter(TXK.Lufttemperatur_Max > 25) %>%
+  count() %>%
+  ggplot(aes(x = year, y = n)) +
+  geom_bar(stat = "identity", aes(fill = n)) +
+  scale_fill_distiller(palette = "YlOrRd",direction = 1) +
+  labs(title = "Anzahl Tage pro Jahr mit einer Temperatur unter -5°C",
+       fill = "Anzahl Tage",
+       x = "Jahr",
+       y = "Anzahl Tage") +
+  theme_minimal()
+
+```
+
+### Wie viele sehr kalte Tage?
+
+In diesem Abschnitt wird untersucht, wie viele sehr kalte Tage es in Kiel pro Jahr gegeben hat.
+Dabei fällt auf, dass auch hier die Anzahl sehr kalter Tage immer geringer wird. Seit der Jahrtausendwende gab es nicht mehr als ein Jahr in dem es mehr als 10 Tage unter -5°C kalt geworden ist.
+```{r}
+df <- df_holt %>%
+  full_join(df_kron, by = "MESS_DATUM") %>%
+  mutate(TNK.Lufttemperatur_Min = case_when(is.na(TNK.Lufttemperatur_Min.x) & !is.na(TNK.Lufttemperatur_Min.y) ~ TNK.Lufttemperatur_Min.y,
+                                            TRUE ~ TNK.Lufttemperatur_Min.x))
+df %>%
+  mutate(year = lubridate::year(MESS_DATUM)) %>%
+  group_by(year) %>%
+  filter(TNK.Lufttemperatur_Min < -5) %>%
+  count() %>%
+  ggplot(aes(x = year, y = n)) +
+  geom_bar(stat = "identity", aes(fill = n)) +
+  scale_fill_distiller(palette = "Blues",direction = 1) +
+  labs(title = "Anzahl Tage pro Jahr mit einer Temperatur unter -5°C",
+       x = "Jahr",
+       y = "Anzahl Tage") +
+  theme(legend.position = "right", legend.title = element_blank()) +
+  theme_minimal()
+```
+
+### Durchschnittliche Monatstemperatur
+In diesem Abschnitt wird die durchschnittliche Monatstemperatur zwischen 1940 und 2010 über 10 Jahre gemittelt verglichen. 
+Da es keine Messstation gibt, die über einen so langen Zeitraum Daten aufgezeichnet hat, werden die Daten von zwei verschiedenen Messstationen in Kiel genutzt. Hier habe ich zunächst geschaut, ob sich die Temperaturen an den beiden Stationen signifikant unterscheiden, indem Zeiträume gesucht werden, an denen beiden Messstationen Werte aufgezeichnet haben und der Unterschied verglichen. 
+Dabei fällt auf, dass die Daten im Durchschnitt nur um -0.5 bis 0.2 °C abweichen, sodass die beiden Stationen als Vergleichsstationen genommen werden können.
+
+Es fällt auf, dass die Durchschnittstemperatur in den 70 Jahren um bis zu 3°C gestiegen ist. Besonders in den Wintermonaten Januar und Februar ist der Unterschied auffällig, da die Durchschnittstemperatur ins Positive gestiegen ist. 
+
+
+```{r}
+
+df_holt %>%
+  inner_join(df_kron, by = "MESS_DATUM") %>% 
+  mutate(Monat = lubridate::month(MESS_DATUM, label = TRUE),
+         year = lubridate::year(MESS_DATUM)) %>%
+  select(MESS_DATUM,Monat, year, TMK.Lufttemperatur.x, TMK.Lufttemperatur.y) %>%
+  drop_na() %>%
+  mutate("difference" = TMK.Lufttemperatur.x-TMK.Lufttemperatur.y) %>%
+  group_by(Monat)%>%
+  summarise("Abweichung_Durchschnitt" = mean(difference)) %>%
+  arrange(Abweichung_Durchschnitt)
+
+df_1940 <- df_kron %>%
+  mutate(year = lubridate::year(MESS_DATUM),
+         month = lubridate::month(MESS_DATUM, label = TRUE)) %>%
+  filter(year >=1940 & year < 1950) %>%
+  group_by(month) %>%
+  summarise(mean_temp = mean(TMK.Lufttemperatur, na.rm = TRUE))
+  
+df_2010 <- df_holt %>%
+  mutate(year = lubridate::year(MESS_DATUM),
+         month = lubridate::month(MESS_DATUM, label = TRUE)) %>%
+  filter(year >=2010& year < 2020) %>%
+  group_by(month) %>%
+  summarise(mean_temp = mean(TMK.Lufttemperatur, na.rm = TRUE))
+
+df_1940 %>%
+  inner_join(df_2010, by = "month") %>%
+  rename("1940-1949" = mean_temp.x, "2010-2019" = mean_temp.y) %>%
+  pivot_longer(cols = c("1940-1949", "2010-2019"), names_to = "Zeitraum") %>%
+  ggplot(aes(x = month, y = value))+ 
+  geom_col(position = "dodge", aes(color = Zeitraum, fill = Zeitraum), alpha = 1) + 
+  scale_fill_manual(values = c("#ffbb00", "#ff3d00")) +
+  scale_color_manual(values = c("#BF9930", "#BF5230"))+ 
+  labs(title = "Vergleich Durchschnittstemperatur zwischen 1940 und 2010",
+       x ="Monat", 
+       y = "Temperatur in °C",
+       fill = "",
+       color = "")  +
+  theme_minimal()
+```
+
+### Welche Temperatur kann man in Kiel erwarten?
+In diesem Abschnitt werden die letzten 20 Jahre der Temperaturmessung in Kiel-Holtenau ausgewertet.
+Dabei wird die durschnittliche tägliche Maximaltemperatur und Minimaltemperatur für jeden Monat ausgewertet und ausgegeben.
+
+```{r}
+df_holt %>%
+  mutate(year = lubridate::year(MESS_DATUM),
+         month = lubridate::month(MESS_DATUM, label = TRUE)) %>%
+  select(TXK.Lufttemperatur_Max, TNK.Lufttemperatur_Min, month, year, MESS_DATUM) %>%
+  filter(year > 2000) %>%
+  group_by(month) %>%
+  summarise("Höchsttemp." = mean(TXK.Lufttemperatur_Max, na.rm = TRUE),
+            "Mindesttemp." = mean(TNK.Lufttemperatur_Min, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Höchsttemp., Mindesttemp.), names_to = "min_max") %>%
+  ggplot(aes(x = month, y = value, group = min_max, color = min_max, label = paste(round(value, 0), "°C")))+
+  geom_line(size = 1.5) +
+  geom_point(shape = 21, size = 3, fill = "white")+
+  geom_text(hjust = 0.4, vjust = -1.6, show.legend = FALSE) +
+  scale_color_manual(values = c( "#cc0000","#032f60")) +
+  ylim(-3, 27) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title = element_blank()) +
+  labs(title = "Temperaturverlauf in Kiel über Monate",
+        x = "Monat",
+        y = "Temperatur")
+```
+
+### Wie ist das Wetter während der Kieler Woche?
+```{r}
+KielerWoche <- read_csv("C:/Users/Julian/OneDrive/FH Kiel/DataViz/Portfolio_Climate/KielerWoche.csv", 
+    col_types = cols(X4 = col_skip(), X5 = col_skip()), 
+    locale = locale(encoding = "WINDOWS-1252"), 
+    skip = 2) %>%
+  drop_na()
+
+KielerWoche <- KielerWoche %>%
+  mutate(start = dmy(paste(X2, X1)),
+         end = dmy(paste(X3, X1))) %>%
+  select(X1, start, end) %>%
+  transmute( month = map2(start, end, seq, by = "1 day")) %>%
+  unnest() %>%
+  distinct()
+
+df_holt %>%
+  filter(as_date(MESS_DATUM) %in% as_date(as_vector(KielerWoche)))%>%
+  mutate(year = year(MESS_DATUM)) %>%
+  group_by(year) %>%
+  summarise(temp = mean(TMK.Lufttemperatur, na.rm = TRUE),
+            niederschlag = mean(RSK.Niederschlagshoehe, na.rm = TRUE), 
+            wind = mean(FM.Windgeschwindigkeit, na.rm = TRUE),
+            sonne = mean(SDK.Sonnenscheindauer, na.rm = TRUE),
+            bedeckung = mean(NM.Bedeckungsgrad, na.rm = TRUE)) %>%
+  drop_na() %>%
+  ggplot(aes(x = year, y = bedeckung)) +
+  geom_line()
+```
+
