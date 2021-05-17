@@ -1,15 +1,25 @@
 ---
-title: "Climate_Change_Norddeutschland"
+title: "Temperatur und Wetter in Kiel"
 author: "Julian"
 date: "28.4.2021"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
+### Einleitung
 
+In dieser Arbeit werden historische Klima- und Wetterdaten von Kiel analysiert und mit heutigen Daten verglichen. 
+Dabei wird ein besonderes Augenmerk auf die Veränderung der Extremtemperaturen zwischen den Daten vor 1950 und der heuten Zeit gelegt. 
+Es stellt sich hierbei die Frage, ob es einen Effekt des Klimawandels zu entdecken gibt, den man mit relativ einfachen Analysen entdecken und visualisieren kann. 
+Andere Studien zum Klimawandel sind meistens aufwendiger und betrachten größere Bereiche als nur eine Landeshauptstadt von der Größe Kiels. Dazu kommt, dass eine Analyse eines einzelnen Ortes auch auf andere Faktoren als einen globalen Klimawandel zurückzuführen sein könnte. 
+Die Ergebnisse dienen insofern nicht zur eine Bestätigung oder Ablehnung des Klimawandels sondern sind hauptsächlich als Ergebnis einer Prüfungsleistung zum Thema Datenvisualisierung gedacht.
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ### Include librarys
+
 ```{r}
 library(tidyverse)
 library(dplyr)
@@ -17,10 +27,11 @@ library(saqgetr)
 library(leaflet)
 library(rdwd) 
 library(lubridate)
+library(kableExtra)
+library(gridExtra)
 ```
 
 ### Analyse Climate and weather in Kiel
-
 
 ```{r}
 data(geoIndex)  
@@ -28,13 +39,19 @@ data(metaIndex, package = "rdwd")
 ```
 
 ### Daten einlesen
-Die Daten für diese Arbeit stammen vom Deutschen Wetterdienst (DWD). Mittels des *rdwd* packages können hier aus der Datenbank des DWD historische Wetterdaten und Temperaturmessungen aus ganz Deutschland eingelesen werden. 
-Für Kiel gibt es drei Wetterstationen, die historische Daten liefern. Mittels der *data* Funktion können die Metainformationen aus dem rdwd-Package angesehen werden. Darin finden sich die drei Stationen Kiel-Holtenau, Kiel-Kronshagen und Leuchtturm Kiel. Die erste Station, Kiel-Holtenau liefert seit 1881 bis heute Wetterdaten in täglicher Auflösung. Kiel-Kronshagen zeichnet seit 1988 keine Daten mehr auf und der Leuchtturm Kiel zeichnet seit 1990 bis heute Wetterdaten auf. 
+
+Die Daten für diese Arbeit stammen vom Deutschen Wetterdienst (DWD).
+Mittels des *rdwd* packages können hier aus der Datenbank des DWD historische Wetterdaten und Temperaturmessungen aus ganz Deutschland eingelesen werden.
+Für Kiel gibt es drei Wetterstationen, die historische Daten liefern.
+Mittels der *data* Funktion können die Metainformationen aus dem rdwd-Package angesehen werden.
+Darin finden sich die drei Stationen Kiel-Holtenau, Kiel-Kronshagen und Leuchtturm Kiel.
+Die erste Station, Kiel-Holtenau liefert seit 1881 bis heute Wetterdaten in täglicher Auflösung.
+Kiel-Kronshagen zeichnet seit 1988 keine Daten mehr auf und der Leuchtturm Kiel zeichnet seit 1990 bis heute Wetterdaten auf.
 Da die Temperatur der Wetterstation Leuchtturm eher nicht mit der Temperatur auf dem Festland zu vergleichen ist, werden diese Daten in den Analysen nicht betrachtet.
 
-Im nächsten Absatz werden zunächst alle Wetterdaten aus diesen drei Stationen in täglicher Auflösung eingelesen und in einen Dataframe gespeichert. 
+Im nächsten Absatz werden zunächst alle Wetterdaten aus diesen drei Stationen in täglicher Auflösung eingelesen und in einen Dataframe gespeichert.
 
-```{r}
+```{r, results="hide"}
 link_holt <- rdwd::selectDWD("Kiel-Holtenau", res="daily", var="kl", per="history")
 link_kron <- rdwd::selectDWD("Kiel-Kronshagen", res="daily", var="kl", per="history")
 link_turm <- rdwd::selectDWD("Leuchtturm Kiel", res="daily", var="kl", per="history")
@@ -47,9 +64,13 @@ df_turm <- rdwd::readDWD(file_turm, varnames=TRUE, fread = FALSE)
 ```
 
 ### Wie viele sehr heiße Tage
-In diesem Abschnitt wird untersucht, wie viele sehr heiße Tage es in jedem Jahr gab. Als heißer Tag wird ein Tag definiert, an dem die Maximaltemperatur über 25°C gewesen ist. 
-Dafür werden erst die beiden Datensätze Kiel-Holtenau und Kiel-Kronshagen miteinander gejoint, da in Kiel_Holtenau die Variable der maximalen Lufttemperatur erst seit 1986 aufgezeichnet wird. Nach dem Join wird eine extra Spalte erzeugt, in der die maximale Tagestemperatur von Kiel-Holtenau oder Kiel-Kronshagen gespeichert wird, je nachdem, welche zur Verfügung steht. 
-Dabei entsteht eine Datenlücke in den Jahren zwischen 2000 und 2005. 
+
+In diesem Abschnitt wird untersucht, wie viele sehr heiße Tage es in jedem Jahr gab.
+Als heißer Tag wird hier ein Tag definiert, an dem die Maximaltemperatur über eine Grenze von 25°C geklettert ist.
+Dafür werden erst die beiden Datensätze Kiel-Holtenau und Kiel-Kronshagen miteinander gejoint, da in Kiel_Holtenau die Variable der maximalen Lufttemperatur erst seit 1986 aufgezeichnet wird.
+Nach dem Join wird eine extra Spalte erzeugt, in der die maximale Tagestemperatur von Kiel-Holtenau oder Kiel-Kronshagen gespeichert wird, je nachdem, welche zur Verfügung steht.
+Dabei entsteht eine Datenlücke in den Jahren zwischen 2000 und 2005.
+Auffällig ist neben der oben erwähnten Lücke der lange, der heiße Zeitraum der beiden Jahre 1975 und 1976. Es ist kein eindeutiger Trend zu erkennen, nach dem die Anzahl der heißen Tage im Jahr seit 1940 stetig zu genommen hätte. Trotzdem fällt auf, dass es seit 1980 deutlich mehr Jahre gegeben hat, in denen die Temperatur mehr als 10 Mal im Jahr über 25 Grad gelegen hat. Auch das heißeste Jahr fand in der heutigen Zeit, im Jahr 2018 statt, in dem es fast 40 heiße Tage gegeben hat. 
 
 ```{r}
 df_hot <- df_holt %>%
@@ -67,7 +88,7 @@ df_hot %>%
   ggplot(aes(x = year, y = n)) +
   geom_bar(stat = "identity", aes(fill = n)) +
   scale_fill_distiller(palette = "YlOrRd",direction = 1) +
-  labs(title = "Anzahl Tage pro Jahr mit einer Temperatur unter -5°C",
+  labs(title = "Anzahl Tage pro Jahr mit einer Temperatur über 25°C",
        fill = "Anzahl Tage",
        x = "Jahr",
        y = "Anzahl Tage") +
@@ -78,7 +99,10 @@ df_hot %>%
 ### Wie viele sehr kalte Tage?
 
 In diesem Abschnitt wird untersucht, wie viele sehr kalte Tage es in Kiel pro Jahr gegeben hat.
-Dabei fällt auf, dass auch hier die Anzahl sehr kalter Tage immer geringer wird. Seit der Jahrtausendwende gab es nicht mehr als ein Jahr in dem es mehr als 10 Tage unter -5°C kalt geworden ist.
+Dabei fällt auf, dass auch hier die Anzahl sehr kalter Tage immer geringer wird.
+Seit der Jahrtausendwende gab es nicht mehr als ein Jahr in dem es mehr als 10 Tage unter -5°C kalt geworden ist.
+Dadurch ergibt sich der Eindruck, dass das Klima in Kiel eher wärmer als kälter wird. 
+
 ```{r}
 df <- df_holt %>%
   full_join(df_kron, by = "MESS_DATUM") %>%
@@ -93,6 +117,7 @@ df %>%
   geom_bar(stat = "identity", aes(fill = n)) +
   scale_fill_distiller(palette = "Blues",direction = 1) +
   labs(title = "Anzahl Tage pro Jahr mit einer Temperatur unter -5°C",
+       fill = "Anzahl Tage",
        x = "Jahr",
        y = "Anzahl Tage") +
   theme(legend.position = "right", legend.title = element_blank()) +
@@ -100,14 +125,18 @@ df %>%
 ```
 
 ### Durchschnittliche Monatstemperatur
-In diesem Abschnitt wird die durchschnittliche Monatstemperatur zwischen 1940 und 2010 über 10 Jahre gemittelt verglichen. 
-Da es keine Messstation gibt, die über einen so langen Zeitraum Daten aufgezeichnet hat, werden die Daten von zwei verschiedenen Messstationen in Kiel genutzt. Hier habe ich zunächst geschaut, ob sich die Temperaturen an den beiden Stationen signifikant unterscheiden, indem Zeiträume gesucht werden, an denen beiden Messstationen Werte aufgezeichnet haben und der Unterschied verglichen. 
+
+In diesem Abschnitt wird die durchschnittliche Monatstemperatur zwischen 1940 und 2010 über 10 Jahre gemittelt verglichen.
+Da es keine Messstation gibt, die über einen so langen Zeitraum Daten aufgezeichnet hat, werden die Daten von zwei verschiedenen Messstationen in Kiel genutzt.
+Hier habe ich zunächst geschaut, ob sich die Temperaturen an den beiden Stationen signifikant unterscheiden, indem Zeiträume gesucht werden, an denen beiden Messstationen Werte aufgezeichnet haben und der Unterschied verglichen.
 Dabei fällt auf, dass die Daten im Durchschnitt nur um -0.5 bis 0.2 °C abweichen, sodass die beiden Stationen als Vergleichsstationen genommen werden können.
 
-Es fällt auf, dass die Durchschnittstemperatur in den 70 Jahren um bis zu 3°C gestiegen ist. Besonders in den Wintermonaten Januar und Februar ist der Unterschied auffällig, da die Durchschnittstemperatur ins Positive gestiegen ist. 
-
+Es fällt auf, dass die Durchschnittstemperatur in den 70 Jahren um bis zu 3°C gestiegen ist.
+Besonders in den Wintermonaten Januar und Februar ist der Unterschied auffällig, da die Durchschnittstemperatur ins Positive gestiegen ist. 
+Dies verstärkt den zuvor gewonnenen Eindruck, dass das Wetter in Kiel immer wärmer wird.
 
 ```{r}
+
 
 df_holt %>%
   inner_join(df_kron, by = "MESS_DATUM") %>% 
@@ -117,8 +146,11 @@ df_holt %>%
   drop_na() %>%
   mutate("difference" = TMK.Lufttemperatur.x-TMK.Lufttemperatur.y) %>%
   group_by(Monat)%>%
-  summarise("Abweichung_Durchschnitt" = mean(difference)) %>%
-  arrange(Abweichung_Durchschnitt)
+  summarise("difference" = mean(difference)) %>%
+  mutate(difference = round(difference, 2))%>%
+  rename("Durchschnittliche Abweichung (°C)" = difference) %>%
+  kable("html", caption = "Auflistung über die monatlichen Abweichungen der Durchschnittstemperatur der beiden Messstationen Kiel-Holtenau und Kiel-Kronshagen") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
 
 df_1940 <- df_kron %>%
   mutate(year = lubridate::year(MESS_DATUM),
@@ -151,11 +183,13 @@ df_1940 %>%
 ```
 
 ### Welche Temperatur kann man in Kiel erwarten?
+
 In diesem Abschnitt werden die letzten 20 Jahre der Temperaturmessung in Kiel-Holtenau ausgewertet.
 Dabei wird die durschnittliche tägliche Maximaltemperatur und Minimaltemperatur für jeden Monat ausgewertet und ausgegeben.
+In diesem Plot wird gezielt auf einen Vergleich
 
 ```{r}
-df_holt %>%
+plot_holt <-df_holt %>%
   mutate(year = lubridate::year(MESS_DATUM),
          month = lubridate::month(MESS_DATUM, label = TRUE)) %>%
   select(TXK.Lufttemperatur_Max, TNK.Lufttemperatur_Min, month, year, MESS_DATUM) %>%
@@ -176,9 +210,33 @@ df_holt %>%
   labs(title = "Temperaturverlauf in Kiel über Monate",
         x = "Monat",
         y = "Temperatur")
+
+plot_kron <- df_kron %>%
+  mutate(year = lubridate::year(MESS_DATUM),
+         month = lubridate::month(MESS_DATUM, label = TRUE)) %>%
+  select(TXK.Lufttemperatur_Max, TNK.Lufttemperatur_Min, month, year, MESS_DATUM) %>%
+  filter(year < 1960) %>%
+  group_by(month) %>%
+  summarise("Höchsttemp." = mean(TXK.Lufttemperatur_Max, na.rm = TRUE),
+            "Mindesttemp." = mean(TNK.Lufttemperatur_Min, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Höchsttemp., Mindesttemp.), names_to = "min_max") %>%
+  ggplot(aes(x = month, y = value, group = min_max, color = min_max, label = paste(round(value, 0), "°C")))+
+  geom_line(size = 1.5) +
+  geom_point(shape = 21, size = 3, fill = "white")+
+  geom_text(hjust = 0.4, vjust = -1.6, show.legend = FALSE) +
+  scale_color_manual(values = c( "#cc0000","#032f60")) +
+  ylim(-3, 27) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title = element_blank()) +
+  labs(title = "Temperaturverlauf in Kiel über Monate",
+        x = "Monat",
+        y = "Temperatur")
+plot_holt
 ```
 
 ### Wie ist das Wetter während der Kieler Woche?
+
 ```{r}
 KielerWoche <- read_csv("C:/Users/Julian/OneDrive/FH Kiel/DataViz/Portfolio_Climate/KielerWoche.csv", 
     col_types = cols(X4 = col_skip(), X5 = col_skip()), 
@@ -207,4 +265,3 @@ df_holt %>%
   ggplot(aes(x = year, y = bedeckung)) +
   geom_line()
 ```
-
