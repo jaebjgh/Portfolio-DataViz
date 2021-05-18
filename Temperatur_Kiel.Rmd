@@ -28,6 +28,7 @@ library(leaflet)
 library(rdwd) 
 library(lubridate)
 library(kableExtra)
+library(plotly)
 library(gridExtra)
 ```
 
@@ -233,6 +234,52 @@ plot_kron <- df_kron %>%
 plot_holt
 ```
 
+```{r}
+df_1 <- df_holt %>%
+  mutate(year = lubridate::year(MESS_DATUM),
+         month = lubridate::month(MESS_DATUM, label = TRUE)) %>%
+  select(TXK.Lufttemperatur_Max, TNK.Lufttemperatur_Min, month, year, MESS_DATUM) %>%
+  filter(year > 2000) %>%
+  group_by(month) %>%
+  summarise("Höchsttemp.2000" = mean(TXK.Lufttemperatur_Max, na.rm = TRUE),
+            "Mindesttemp.2000" = mean(TNK.Lufttemperatur_Min, na.rm = TRUE),
+            "year" = min(year, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Höchsttemp.2000, Mindesttemp.2000), names_to = "min_max")
+
+df_2 <- df_kron %>%
+  mutate(year = lubridate::year(MESS_DATUM),
+         month = lubridate::month(MESS_DATUM, label = TRUE)) %>%
+  select(TXK.Lufttemperatur_Max, TNK.Lufttemperatur_Min, month, year, MESS_DATUM) %>%
+  filter(year < 1960) %>%
+  group_by(month) %>%
+  summarise("Höchsttemp.1960" = mean(TXK.Lufttemperatur_Max, na.rm = TRUE),
+            "Mindesttemp.1960" = mean(TNK.Lufttemperatur_Min, na.rm = TRUE),
+            "year" = min(year, na.rm = TRUE)) %>%
+  pivot_longer(cols = c(Höchsttemp.1960, Mindesttemp.1960), names_to = "min_max")
+
+df_both <- rbind(df_1, df_2)
+
+df_both %>%
+  ggplot(aes(x = month, 
+             y = value, 
+             group = min_max,
+             color = min_max, 
+             label = paste(round(value, 0), "°C")))+
+  geom_line(size = 1.5) +
+  geom_point(data = df_1, shape = 21, size = 3, fill = "white")+
+  geom_text(data = df_1, hjust = 0.4, vjust = -1.6, show.legend = FALSE) +
+  scale_color_manual(values = c( "#FFD6D6","#cc0000","#D8E9FD","#032f60")) +
+  ylim(-3, 30) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title = element_blank()) +
+  labs(title = "Temperaturverlauf in Kiel über Monate im Vergleich (1940-1960 und 2000-2019)",
+        x = "Monat",
+        y = "Temperatur in °C")
+
+```
+
+
 ### Wie ist das Wetter während der Kieler Woche?
 
 ```{r}
@@ -249,17 +296,4 @@ KielerWoche <- KielerWoche %>%
   transmute( month = map2(start, end, seq, by = "1 day")) %>%
   unnest() %>%
   distinct()
-
-df_holt %>%
-  filter(as_date(MESS_DATUM) %in% as_date(as_vector(KielerWoche)))%>%
-  mutate(year = year(MESS_DATUM)) %>%
-  group_by(year) %>%
-  summarise(temp = mean(TMK.Lufttemperatur, na.rm = TRUE),
-            niederschlag = mean(RSK.Niederschlagshoehe, na.rm = TRUE), 
-            wind = mean(FM.Windgeschwindigkeit, na.rm = TRUE),
-            sonne = mean(SDK.Sonnenscheindauer, na.rm = TRUE),
-            bedeckung = mean(NM.Bedeckungsgrad, na.rm = TRUE)) %>%
-  drop_na() %>%
-  ggplot(aes(x = year, y = bedeckung)) +
-  geom_line()
 ```
