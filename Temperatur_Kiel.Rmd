@@ -1,7 +1,7 @@
 ---
 title: "Temperatur und Wetter in Kiel"
-author: "Julian"
-date: "28.4.2021"
+author: "Julian Berger"
+date: "18.05.2021"
 output: html_document
 editor_options: 
   markdown: 
@@ -136,8 +136,6 @@ Besonders in den Wintermonaten Januar und Februar ist der Unterschied auffällig
 Dies verstärkt den zuvor gewonnenen Eindruck, dass das Wetter in Kiel immer wärmer wird.
 
 ```{r}
-
-
 df_holt %>%
   inner_join(df_kron, by = "MESS_DATUM") %>% 
   mutate(Monat = lubridate::month(MESS_DATUM, label = TRUE),
